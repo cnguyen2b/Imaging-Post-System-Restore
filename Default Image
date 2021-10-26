@@ -1,0 +1,779 @@
+@REM		CHRISTOPHER NGUYEN
+@REM		ANSI
+@REM		OCT 25 2021
+@REM		PostSystemRestore.bat
+@REM		2021-OCT-25 		Added Changing Computer Name
+@echo off
+set user=%username%
+set cname=%hostname%
+set dateUpdated=2021-OCT-25
+
+
+:: BatchGotAdmin
+@rem :-----------------------------------------------------------------------------------------
+@REM  --> Check for permissions
+>nul 2>&1 "%SYSTEMROOT%\system32\cacls.exe" "%SYSTEMROOT%\system32\config\system"
+
+@REM --> If error flag set, we do not have admin.
+if '%errorlevel%' NEQ '0' (
+    echo Requesting administrative privileges...
+    goto UACPrompt
+) else ( goto gotAdmin )
+
+:UACPrompt
+    REM 
+	echo Set UAC = CreateObject^("Shell.Application") > "%temp%\getadmin.vbs"
+	echo Set UAC = CreateObject^("Shell.Application"^) > "%temp%\getadmin.vbs"
+    set params = %*:"=""
+    echo UAC.ShellExecute "cmd.exe", "/c %~s0 %params%", "", "runas", 1 >> "%temp%\getadmin.vbs"
+	pause
+	
+    "%temp%\getadmin.vbs"
+    del "%temp%\getadmin.vbs"
+    exit /B
+
+:gotAdmin
+    pushd "%CD%"
+    CD /D "%~dp0"
+rem :-----------------------------------------------------------------------------------------
+
+
+:Begin
+echo Logged in: %user% (%ComputerName%) 
+echo DateCreated: %dateUpdated%...
+echo *********************************************************************
+echo *                    INITIAL SETUP FOR MACHINES                     *
+echo *********************************************************************
+echo ******************************MAIN MENU******************************
+echo This script will allow you to perform options necessary changes
+echo after restoring an image to a machine.
+echo.
+echo 1 - Update PostSystemRestore Script
+echo 2 - Add/Remove a local user
+echo 3 - Enable Administrator
+echo 4 - Set Up RSA (download SDTID to C:\RSA)
+echo 5 - Enable/Disable Firewall
+echo 6 - Install Dell Kace Agent
+echo 7 - Install Kaspersky Antivirus
+echo 8 - Setup FileMaker
+echo 9 - Add OneLink Dock Serial No
+echo 10 - Enable Bitlocker
+echo.
+echo.LICENSED USERS ONLY
+echo 11 - Install Adobe Acrobat DC Professional
+echo 12 - Set up IP Communicator
+echo 30 - Change Computer Name / Join Domain
+
+
+echo.
+echo Q - Quit
+
+set ans=none
+set /p ans=
+
+If %ans%==1		GOTO UpdatePostSystemRestoreScript
+If %ans%==2  	GOTO EditLocalAccounts
+If %ans%==3  	GOTO EnableAdmin
+If %ans%==4		GOTO SetupRSA
+If %ans%==5		GOTO SetupFirewall
+If %ans%==6		GOTO SetupDellKace
+If %ans%==7 	GOTO SetupKasperskyAV
+If %ans%==8		GOTO SetupFilemaker
+If %ans%==9		GOTO AddOneLinkDockInfo
+If %ans%==10	GOTO EnableBitlocker
+If %ans%==11	GOTO InstallAdobeAcrobatDC
+If %ans%==12	GOTO SetupIPCommunicator	
+If %ans%==20	GOTO RemoveRecentItems
+If %ans%==30	GOTO ChangeComputerName
+
+
+
+If /I %ans%==q		GOTO Quit
+
+
+GOTO WrongChoice
+
+rem *******************************************************************
+:UpdatePostSystemRestoreScript
+
+pushd "\\ny-utility\Central\_Install_Scripts"
+copy "PostSystemRestore.bat" c:\scripts > NULL
+
+copy "FixPrinters.bat" c:\scripts > NULL
+copy "removePrinters.vbs" c:\scripts > NULL
+copy "removeSetOnceKey.bat" c:\scripts > NULL
+copy "SetupIPCommunicator.bat" c:\scripts > NULL
+copy "CurrentOULocation.vbs" c:\scripts > NULL
+IF NOT EXIST "c:\scripts\Link\" MKDIR "C:\scripts\Link\"
+copy "View\Fix Printers.lnk" c:\scripts\Link > NULL
+copy "View\Fix Printers.lnk" "C:\ProgramData\Microsoft\Windows\Start Menu\Programs" > NULL
+popd
+
+echo PostSystemRestore.bat updated!
+pause
+rem Remove 
+c:
+cd "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp"
+del remove_recent_items.bat
+del "C:\Users\Public\Desktop\Dolby Audio.lnk"
+del "C:\Users\Public\Desktop\Connect2.lnk"
+del "%userprofile%\Desktop\RSA SecurID Token.lnk"
+
+
+start C:\Scripts\PostSystemRestore.bat
+
+exit
+
+GOTO Begin
+
+:EditLocalAccounts
+cls
+net user
+echo Are there any accounts you would like to add or remove?
+echo 1 - Add local user account
+echo 2 - Remove local user account
+echo.
+echo 3 - Remove profiles (from User Profiles)
+echo q - Quit
+
+
+set /p ans=
+
+If %ans%==1    (
+				SET status=add
+				SET action= add
+				echo Enter a valid complex password:
+				SET /p password=
+				GOTO EditAccounts
+				)
+If %ans%==2    (
+				SET status=del
+				SET action=remove
+				GOTO EditAccounts
+				)
+If %ans%==3		(
+				start rundll32.exe sysdm.cpl,EditUserProfiles
+				GOTO EditLocalAccounts
+				cls
+				)
+
+
+If /I %ans%==q  GOTO Begin
+
+echo -------------------------------------
+echo Invalid Selection, Please try again!
+echo -------------------------------------
+echo.
+pause
+cls
+GOTO EditLocalAccounts
+
+:ChangeComputerName
+cls
+echo Logged in: %user%...
+echo ***********************************************
+echo *            Change Computer Name             *
+echo ***********************************************
+echo.
+echo c - Change Computer Name (CurrentName: %ComputerName%)
+echo j - Join Domain (Domain: ansi.org)
+echo q - Quit
+
+set localAdmin=admin
+set localPassword=password
+set ans=none
+
+set /p ans=
+
+If /I %ans%==c		GOTO setComputerName
+If /I %ans%==j 		echo JOIN DOMAIN CODE HERE
+If /I %ans%==q		GOTO Begin
+
+
+echo -------------------------------------
+echo Invalid Selection, Please try again!
+echo -------------------------------------
+echo.
+pause
+cls
+GOTO ChangeComputerName
+
+:SetComputerName
+	echo Please type new computer name:
+	set /p newComputerName=
+	
+	echo Type the local administrator name - default: admin
+	set /p localAdmin=
+	
+	echo Type your plain text password - default: password
+	set /p localPassword=
+	
+	echo Set the computer name to:
+	echo.
+	echo New Computer Name: 		%newComputerName% 
+	echo Administrator Username: 	%localAdmin%
+	echo y - yes
+	echo n - no
+	echo q - quit
+	
+	set ans=none
+	
+	set /p ans=
+	
+	echo ans = %ans%
+	
+	If /I %ans%==y	WMIC /node:"%COMPUTERNAME%" /user:%localAdmin% /Password:%localPassword% computersystem call rename "%newComputerName%"
+	If /I %ans%==n	(echo Please try again!
+						GOTO ChangeComputerName
+					)
+	If /I %ans%==q	GOTO ChangeComputerName
+	
+	GOTO Begin
+rem *******************************************************************
+
+:SetUpRSA
+@echo off
+SET user=none
+echo Enter the username of the person you are setting up:
+set /p user=
+
+
+
+@echo off
+
+pushd "\\ny-ops\RSA-QR"
+IF NOT EXIST %user% 	(
+						echo Please check to see if token exists!
+						%SystemRoot%\explorer.exe "\\ny-ops\RSA-QR"
+						pause
+						Goto SetUpRSA
+						)
+
+
+c:
+cd\
+md RSA
+cd RSA
+md %user%
+cd %user%
+md SDTID
+
+
+pushd "\\ny-ops\RSA"
+copy "*%user%*" c:\RSA\%user%
+popd
+
+pushd "\\ny-ops\RSA-QR"
+cd %user%
+copy "*%user%*" c:\RSA\%user%
+popd
+
+C:
+cd\
+cd RSA\%user%
+IF NOT EXIST %user%.sdtid ren *%user%*.sdtid %user%.sdtid
+IF EXIST %user%.sdtid copy %user%.sdtid c:\RSA\%user%\SDTID\%user%.sdtid
+
+echo.
+IF NOT EXIST *%user%*.sdtid echo Cannot find the token: %user%.sdtid!
+
+cd "C:\ProgramData\Microsoft\Windows\Start Menu\Programs\RSA\RSA SecurID Token"
+REM copy "RSA SecurID Token.lnk" %userprofile%\Desktop
+
+
+@echo Set up is complete for %user%, please press enter to close this window!
+pause
+
+cls
+GOTO Begin
+
+rem *******************************************************************
+:EnableAdmin
+echo Enabling Administrator account
+net user administrator /active:yes /EXPIRES:NEVER
+net user administrator "P@ssw0rd!"
+net user administrator
+echo.
+echo Password is set to P@ssw0rd!  Please add to Password Manager Pro!
+
+GOTO Begin
+
+rem *******************************************************************
+:SetupFirewall
+echo Enable or Disable Firewall?
+echo 1 - Enable
+echo 2 - Disable
+echo 3 - Show firewall Settings
+echo q - Quit
+
+set /p ans=
+
+If %ans%==1 	(
+			set status=on
+			GOTO ChangeFirewall
+		)
+If %ans%==2 	(
+			set status=off
+			GOTO ChangeFirewall
+		)
+If %ans%==3 firewall.cpl
+
+If /I %ans%==q		GOTO Begin
+cls
+GOTO Begin
+
+
+echo -------------------------------------
+echo Invalid Selection, Please try again!
+echo -------------------------------------
+echo.
+pause
+cls
+GOTO SetupFirewall
+
+:ChangeFirewall
+C:
+cd\
+cd windows/system32
+echo Turning domain firewall %status%...
+netsh advfirewall set domainprofile state %status%
+
+echo Turning private firewall %status%...
+netsh advfirewall set privateprofile state %status%
+
+echo Turning public firewall %status%...
+netsh advfirewall set publicprofile state %status%
+echo Completed.
+echo ************************
+echo Open firewall settings?
+echo O - Open
+echo q - Quit
+echo Press any other key to continue!
+set ans=none
+set /p ans=
+If %ans%==o firewall.cpl
+If %ans%==O firewall.cpl
+
+If /I %ans%==q		GOTO Begin
+cls
+GOTO Begin
+
+rem *******************************************************************
+:EditAccounts
+echo.
+echo Enter user account to %action%:
+set /p UserAccount=
+IF %action%==add 	(	echo Adding '%UserAccount%' ...
+						net user %UserAccount% %password% /%status% 
+					)
+IF %action%==remove ( 	echo Removing'%UserAccount%' ...
+						net user %UserAccount% /%status%	
+					)
+
+echo ************************
+echo Profile Options:
+echo 1 - Open User profiles to delete profile
+echo 2 - Open Computer management
+echo 3 - Add/Remove an account
+echo Press any other key to continue
+set ans=none
+set /p ans=
+
+If %ans%==1 start rundll32.exe sysdm.cpl,EditUserProfiles
+If %ans%==2 start lusrmgr.msc
+If %ans%==3 GOTO EditLocalAccounts
+
+If /I %ans%==q		GOTO Begin
+cls
+GOTO EditLocalAccounts
+
+:SetupDellKace
+echo Set up Dell Kace Agent
+echo 1 - Yes
+echo 2 - No
+set ans=none
+set /p ans=
+
+If %ans%==1 	(
+					echo Installing...Please wait!
+					msiexec.exe /qn /i "\\ny-utility\Central\_Standard_Install\KACE AGENT\ampagent-6.4.522-x86.msi" HOST=k1000
+					echo Done.
+					pause
+				)
+
+cls
+GOTO Begin
+
+:SetupKasperskyAV
+cls
+echo Install Kaspersky Antivirus Software
+echo 1 - Managed Antivirus (for machines primarily on the network)
+echo 2 - Unmanaged Antivirus (for machines primarily off the network)
+echo q - Quit 
+set ans=none
+set /p ans=
+
+If %ans%==1		GOTO SetupManagedKasperskyAV
+If %ans%==2		GOTO SetupUnmanagedKasperskyAV
+If /I %ans%==q		GOTO Begin
+
+cls
+GOTO SetupKasperskyAV
+
+:SetupManagedKasperskyAV
+
+
+echo Install Kaspersky Antivirus Software
+echo 1 - Kaspersky Network Agent
+echo 2 - Kaspersky Antivirus 
+echo q - Quit 
+set ans=none
+set /p ans=
+
+If %ans%==1		GOTO InstallNetworkAgent
+If %ans%==2		GOTO InstallKasperskyAV
+If /I %ans%==q		GOTO Begin
+
+
+:InstallNetworkAgent
+echo Press any key to continue AFTER installation is complete!
+pushd "\\kaspersky-sc\KLSHARE\Packages\NetAgent_10.4.343(6)"
+setup.exe
+pause
+popd
+
+GOTO SetupManagedKasperskyAV
+
+:InstallKasperskyAV
+
+echo Press any key to continue AFTER installation is complete!
+pushd "\\kaspersky-sc\KLSHARE\Packages\KES_10.3.0.6294(2)"
+setup.exe
+pause
+popd
+
+GOTO SetupManagedKasperskyAV
+
+
+:SetupUnmanagedKasperskyAV
+
+echo Press any key to continue AFTER installation is complete!
+pushd
+"\\ny-utility\Central\_Standard_Install\Kaspersky Endpoint Agent 10.2.5.3201\setup.exe"
+pause
+popd
+
+cls
+GOTO Begin
+
+:SetupFilemaker
+IF EXIST "C:\Program Files (x86)\FileMaker\FileMaker Pro 11\FileMaker Pro.exe" GOTO AddRegKeysFilemaker
+cls
+echo FileMaker is not installed!
+echo File does not exist:
+echo "C:\Program Files (x86)\FileMaker\FileMaker Pro 11\FileMaker Pro.exe" 
+pause
+cls
+GOTO Begin
+
+:AddRegKeysFilemaker
+	echo Setting up Filemaker...
+
+	REG ADD "HKEY_CURRENT_USER\Software\FileMaker\FileMaker Pro\11.0\FavHostInfo\Entry0" /f
+	REG ADD "HKEY_CURRENT_USER\Software\FileMaker\FileMaker Pro\11.0\FavHostInfo\Entry0" /v Address /t REG_SZ /d NY-FILEMAKER /f
+	REG ADD "HKEY_CURRENT_USER\Software\FileMaker\FileMaker Pro\11.0\FavHostInfo\Entry0" /v DisplayName /t REG_SZ /d NY-FILEMAKER /f
+	REG ADD "HKEY_CURRENT_USER\Software\FileMaker\FileMaker Pro\11.0\FavHostInfo\Entry0" /v FileOption /t REG_DWORD /d 00000001 /f
+	REG ADD "HKEY_CURRENT_USER\Software\FileMaker\FileMaker Pro\11.0\FavHostInfo\Entry0" /v FileNames /t REG_SZ /f
+	REG ADD "HKEY_CURRENT_USER\Software\FileMaker\FileMaker Pro\11.0\FavHostInfo\Summary" /v LastViewType /t REG_DWORD /d 00000000 /f
+	REG ADD "HKEY_CURRENT_USER\Software\FileMaker\FileMaker Pro\11.0\FavHostInfo\Summary" /v Entries /t REG_DWORD /d 00000001 /f
+	REG ADD "HKEY_CURRENT_USER\Software\FileMaker\FileMaker Pro\11.0\Recent File List" /v File00 /t REG_SZ /d "fmnet:/NY-FILEMAKER/NY-Filemaker/ANSI_ESS" /f
+	"C:\Program Files (x86)\FileMaker\FileMaker Pro 11\FileMaker Pro.exe" 
+	pause
+	cls
+Goto Begin
+			
+
+
+:AddOneLinkDockInfo
+c:
+cd\
+
+set backloc=:Begin
+set loc=:Begin
+set OneDockSerial=none
+set OneDockUsername=none
+
+echo Logged in: %user%...
+echo ***********************************************
+echo *            Add OneLink Dock Info            *
+echo ***********************************************
+echo.
+echo 1 - Add OneLink Dock Info Manually
+echo 2 - Read OneLink Dock Info
+echo q - Quit
+
+set ans=none
+set /p ans=
+
+If %ans%==1 GOTO AddOneLinkManually
+If %ans%==2 GOTO QueryOneLink
+If /I %ans%==q GOTO EOF
+
+GOTO Begin
+
+:AddOneLinkManually
+echo Please enter One Dock Serial No:
+set /p OneDockSerial=
+
+echo Please enter the username the Dock is assigned to:
+set /p OneDockUsername=
+
+
+REG ADD "HKLM\SOFTWARE\Wow6432Node\Lenovo\OneLink" /v "AssignedOneLinkDock" /t REG_SZ /d "%OneDockSerial%" /f >NUL
+REG ADD "HKLM\SOFTWARE\Wow6432Node\Lenovo\OneLink" /v "AssignedOneLinkDockUsername" /t REG_SZ /d "%OneDockUsername%" /f >NUL
+
+REG QUERY "HKLM\SOFTWARE\Wow6432Node\Lenovo\OneLink" /s
+
+
+echo Registry Entries Created!
+pause
+
+cls
+goto Begin
+
+:QueryOneLink
+REG QUERY "HKLM\SOFTWARE\Wow6432Node\Lenovo\OneLink" /s
+
+GOTO Begin
+
+:EnableBitlocker
+cls
+
+echo Logged in: %user%...
+echo ************************************************
+echo *               Set Up Bitlocker               *
+echo ************************************************
+echo.
+echo 1 - Check if MBAM is installed
+echo 2 - Check current OU Location
+echo 3 - Launch Bitlocker Setup
+echo 4 - Check Encryption Status
+echo q - Quit
+
+SET /p ans=
+IF %ans%==1		GOTO CheckifMBAMInstalled
+IF %ans%==2		GOTO CheckOULocation
+IF %ans%==3		GOTO LaunchBitlockerSetup
+If %ans%==4		GOTO CheckMBAMStatus
+If /I %ans%==q		GOTO Begin
+
+cls
+
+GOTO EnableBitlocker
+
+:CheckifMBAMInstalled
+
+	IF EXIST "C:\Program Files\Microsoft\MDOP MBAM\MBAMClientUI.exe" (
+			echo MBAM Client is installed!
+			pause
+			cls
+			GOTO EnableBitlocker
+			)
+	cls
+	echo MBAM is not installed! 
+	echo.
+	echo Please make sure the Dell Kace Agent is installed and has scanned this machine.
+	echo If you have installed the Dell Kace Agent recently, please wait a few minutes to
+	echo allow the MBAM Client UI to be installed on the machine.  
+	echo.
+	echo Afterwards, perform this check again.
+	pause
+	cls
+
+GOTO EnableBitlocker
+
+:CheckOULocation
+
+start c:\scripts\CurrentOULocation.vbs
+
+
+GOTO EnableBitlocker
+
+:LaunchBitlockerSetup
+
+	echo Launching Bitlocker setup, please wait...
+	REG ADD "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\MBAM" /v NoStartUpDelay /t REG_DWORD /d 00000001 /f
+
+	start cmd /k "C:\Program Files\Microsoft\MDOP MBAM\MBAMClientUI.exe"
+	
+	cls
+	echo Bitlocker encryption will take a while; You do not have to wait until Bitlocker is complete
+	echo to continue setting up machine.  
+	echo.
+	echo Continue other tasks as necessary.
+	echo.
+	
+	pause
+	
+GOTO EnableBitlocker
+
+
+:CheckMBAMStatus
+
+	manage-bde -status
+	pause
+	echo.
+	echo.
+	echo *Note - Encryption Strength should be 256-AES (Please verify)
+	echo.
+	echo.
+	
+GOTO EnableBitlocker
+
+:InstallAdobeAcrobatDC
+cls 
+
+echo Logged in: %user%...
+echo ********************************************************************
+echo *              Install Adobe Acrobat DC Professional               *
+echo ********************************************************************
+echo.
+echo.Please be sure that the user needs this licensed software BEFORE
+echo.installing.  It is a limited licensed software!
+echo.
+echo 1 - Install Adobe Acrobat DC Pro
+echo q - quit
+
+SET /p ans=
+IF %ans%==1		GOTO SetupAdobeAcrobatDC
+If /I %ans%==q		GOTO Begin
+
+:SetupAdobeAcrobatDC
+
+echo.***Please wait a few minutes, this is an unattended installation!***
+echo.The progress bar should indicated when the installation is complete.
+echo.
+pushd "\\ny-utility\Central\_Standard_Install\Acrobat\Adobe Acrobat DC Pro\Adobe Acrobat"
+setup.exe
+
+popd
+
+
+GOTO Begin
+
+
+:SetupIPCommunicator
+
+echo Please enter the username:
+echo on
+SET /p %user%=
+
+runas /profile /user:ANSI\%user% Start c:\scripts\SetupIPCommunicator.bat
+
+GOTO Begin
+
+
+:RemoveRecentItems
+
+del /F /Q %APPDATA%\Microsoft\Windows\Recent\*
+del /F /Q %APPDATA%\Microsoft\Windows\Recent\AutomaticDestinations\*
+del /F /Q %APPDATA%\Microsoft\Windows\Recent\CustomDestinations\*
+
+echo *Do you want to restart explorer.exe?
+echo (1 - yes)
+
+set /p ans=
+
+
+If /I %ans%==1 (	taskkill /f /im explorer.exe
+					start explorer.exe
+				)
+	
+
+
+
+GOTO Begin
+
+----------------------------------------------------------------------
+
+@REM 	Clear Event Log
+@echo off
+echo Do you want to clear the Event Log?
+echo 1 - ClearEvents
+echo 2 - Skip Clearing Events
+echo q - Quit
+SET /p ans=
+IF %ans%==1		GOTO ClearEvents
+IF %ans%==2		GOTO SkipClearEvents
+If /I %ans%==q		GOTO Begin
+
+:ClearEvents
+@echo off
+Echo **Clearing Events, please wait**
+Echo.
+
+FOR /F "tokens=1,2*" %%V IN ('bcdedit') DO SET adminTest=%%V
+IF (%adminTest%)==(Access) goto noAdmin
+for /F "tokens=*" %%G in ('wevtutil.exe el') DO (call :do_clear "%%G")
+echo.
+goto SkipClearEvents
+:do_clear
+echo clearing %1
+wevtutil.exe cl %1
+goto :eof
+
+:SkipClearEvents
+
+@REM	Shutdown Request?
+@echo off
+Echo Do you want to Shutdown Immediately?
+Echo 1 - Shutdown
+echo 2 - Restart
+echo q - Quit
+SET /p ans=
+
+IF %ans%==1 	GOTO SHUTDOWN
+IF %ans%==2 	GOTO RESTART
+If /I %ans%==q		GOTO Begin
+		GOTO Begin
+
+echo -------------------------------------
+echo Invalid Selection, Please try again!
+echo -------------------------------------
+echo.
+pause
+cls
+GOTO SkipClearEvents
+
+
+:noAdmin
+@echo off
+Echo No Administrative Access
+GOTO SkipClearEvents
+
+:SHUTDOWN
+shutdown /t 1 /s
+GOTO Quit
+
+
+:RESTART
+shutdown /t 1 /r
+GOTO Quit
+-----------------------------------------------------------------
+
+
+:Quit
+
+echo Exiting!
+pause
+:EOF
+exit
+
+:WrongChoice
+echo -------------------------------------
+echo Invalid Selection, Please try again!
+echo -------------------------------------
+echo.
+pause
+cls
+GOTO Begin
